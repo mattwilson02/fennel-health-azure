@@ -1,0 +1,11 @@
+{
+  "name": "fennel-as-is",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Synthetic stand-in for Fennel Health as it runs today. Not a real health app.",
+  "main": "server.js",
+  "dependencies": {
+    "pdfkit": "0.15.2",
+    "pg": "8.13.1"
+  }
+}

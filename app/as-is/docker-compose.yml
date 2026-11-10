@@ -1,0 +1,65 @@
+# Fennel Health as it runs today: two machines in one rack.
+#   "vm1" is the app machine (API, consumer web app, coach dashboard, scheduled jobs, files on local disk).
+#   "vm2" is the database machine.
+# The backup writes to a disk on the same machine as the database. Nothing is replicated.
+name: fennel-as-is
+
+services:
+  vm2-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: fennel
+      POSTGRES_PASSWORD: fennel-demo
+      POSTGRES_DB: fennel
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fennel -d fennel"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  vm2-backup:
+    image: postgres:16-alpine
+    depends_on:
+      vm2-db:
+        condition: service_healthy
+    environment:
+      PGHOST: vm2-db
+      PGUSER: fennel
+      PGPASSWORD: fennel-demo
+      PGDATABASE: fennel
+      BACKUP_EVERY_SEC: "86400"
+    volumes:
+      - backups:/backups
+    command: >
+      sh -c 'while true; do
+        pg_dump > /backups/fennel-$$(date +%Y-%m-%d-%H%M%S).sql && echo "backup written";
+        sleep $${BACKUP_EVERY_SEC};
+      done'
+
+  vm1-app:
+    build: ./app
+    depends_on:
+      vm2-db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://fennel:fennel-demo@vm2-db:5432/fennel
+      DATA_DIR: /data
+      WEBHOOK_SECRET: demo-webhook-secret
+      COACH_USER: coach
+      COACH_PASSWORD: coach-demo
+      DEMO_USER_PASSWORD: demo-password
+      SEED_USERS: "200"
+      INGEST_EVERY_SEC: "86400"
+      REPORT_EVERY_SEC: "604800"
+    ports:
+      - "8080:8080"
+    volumes:
+      - appdata:/data
+
+volumes:
+  pgdata:
+  backups:
+  appdata:

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fennel Coach Dashboard</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; color: #1a1d21; }
+  h1 { font-size: 24px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  td, th { text-align: left; padding: 6px 4px; border-bottom: 1px solid #ddd; font-size: 14px; }
+  .note { color: #666; font-size: 13px; }
+  button, input { font: inherit; padding: 8px 10px; margin: 4px 4px 4px 0; }
+</style>
+</head>
+<body>
+<h1>Coach dashboard</h1>
+<p class="note">Internal tool. Synthetic data only. Flags users whose 3-day glucose average is above 8 mmol/L or sleep average is under 5.5 h.</p>
+<form id="auth">
+  <input id="user" value="coach" aria-label="Username">
+  <input id="pass" type="password" value="coach-demo" aria-label="Password">
+  <button>Load flagged users</button>
+</form>
+<table id="flagged" hidden><thead><tr><th>User</th><th>Glucose avg</th><th>Sleep avg</th></tr></thead><tbody></tbody></table>
+<script>
+document.getElementById('auth').onsubmit = async (e) => {
+  e.preventDefault();
+  const basic = btoa(document.getElementById('user').value + ':' + document.getElementById('pass').value);
+  const res = await fetch('/coach/api/flagged', { headers: { Authorization: 'Basic ' + basic } });
+  if (!res.ok) return alert('Wrong username or password');
+  const rows = await res.json();
+  const table = document.getElementById('flagged');
+  table.hidden = false;
+  table.querySelector('tbody').innerHTML = rows.map((r) =>
+    `<tr><td>${r.display_name}</td><td>${r.glucose_avg ?? '-'}</td><td>${r.sleep_avg ?? '-'}</td></tr>`).join('');
+};
+</script>
+</body>
+</html>

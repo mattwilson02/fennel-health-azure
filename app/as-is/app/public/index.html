@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fennel Health</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 560px; margin: 40px auto; padding: 0 16px; color: #1a1d21; }
+  h1 { font-size: 24px; }
+  input, button, select { font: inherit; padding: 8px 10px; margin: 4px 4px 4px 0; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  td, th { text-align: left; padding: 6px 4px; border-bottom: 1px solid #ddd; font-size: 14px; }
+  .note { color: #666; font-size: 13px; }
+  [hidden] { display: none; }
+</style>
+</head>
+<body>
+<h1>Fennel Health</h1>
+<p class="note">Consumer web app. Synthetic data only.</p>
+
+<form id="login">
+  <input id="email" value="user1@example.test" aria-label="Email">
+  <input id="password" type="password" value="demo-password" aria-label="Password">
+  <button>Sign in</button>
+</form>
+
+<section id="home" hidden>
+  <h2 id="name"></h2>
+  <form id="log">
+    <select id="kind"><option>glucose</option><option>sleep</option><option>food</option></select>
+    <input id="value" type="number" step="0.1" value="6.2" aria-label="Value">
+    <input id="unit" value="mmol/L" aria-label="Unit">
+    <button>Log reading</button>
+  </form>
+  <p><a id="report" href="#">Download my latest weekly report</a></p>
+  <table id="readings"><thead><tr><th>When</th><th>Kind</th><th>Value</th><th>Source</th></tr></thead><tbody></tbody></table>
+</section>
+
+<script>
+let token = '';
+const $ = (id) => document.getElementById(id);
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, ...(opts.headers || {}) } });
+  return res;
+}
+async function load() {
+  const res = await api('/api/readings');
+  const rows = await res.json();
+  $('readings').querySelector('tbody').innerHTML = rows.map((r) =>
+    `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${r.kind}</td><td>${r.value} ${r.unit}</td><td>${r.source}</td></tr>`).join('');
+}
+$('login').onsubmit = async (e) => {
+  e.preventDefault();
+  const res = await api('/api/login', { method: 'POST', body: JSON.stringify({ email: $('email').value, password: $('password').value }) });
+  if (!res.ok) return alert('Wrong email or password');
+  const data = await res.json();
+  token = data.token;
+  $('name').textContent = data.name;
+  $('home').hidden = false;
+  load();
+};
+$('log').onsubmit = async (e) => {
+  e.preventDefault();
+  await api('/api/readings', { method: 'POST', body: JSON.stringify({ kind: $('kind').value, value: Number($('value').value), unit: $('unit').value }) });
+  load();
+};
+$('report').onclick = async (e) => {
+  e.preventDefault();
+  const res = await api('/api/reports/latest');
+  if (!res.ok) return alert('No report yet. An operator runs the weekly job.');
+  window.open(URL.createObjectURL(await res.blob()));
+};
+</script>
+</body>
+</html>
